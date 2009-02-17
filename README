@@ -1,0 +1,42 @@
+
+		       Series 60 Compatibility
+
+These modules are intended to enable running of many Python for Series
+60 scripts on the desktop.  They are based on wxPython.
+
+ * appuifw.py - S60 application user interface framework.
+ * e32.py - Symbian OS utilities.
+ * graphics.py - 2D graphics primitives.
+ * key_codes.py - constants required by the appuifw module.
+
+This software requires wxPython 2.5.3.1 or later, with Unicode support.
+It has been tested on Mac OS X 10.4 (which includes wxPython 2.5.3.1),
+on Linux (with wxPython built from sources -- see below), and on Windows
+(some time ago, sorry).  The graphics module has mainly only been tested
+on Linux.
+
+After you have added this directory to your PYTHONPATH, you can try out
+some of the example scripts included with Python for S60 (available at
+http://forum.nokia.com/python/ or http://sourceforge.net/projects/pys60/):
+
+ * python weather_info.py
+ * python SMS_example.py
+ * python rssreader.py
+ * python ball.py
+ * python snake.py
+
+On Mac OS X, you need to use the "pythonw" command instead of "python".
+
+Here is how we built wxPython for Linux:
+
+   cd wxPython-src-2.5.3.1        # Better to use 2.6.x nowadays.
+   mkdir bld
+
+   cd bld
+   ../configure --enable-unicode
+   make
+   sudo make install
+
+   cd ../wxPython
+   python setup.py build CORE_ONLY=1 UNICODE=1
+   sudo python setup.py install CORE_ONLY=1 UNICODE=1
