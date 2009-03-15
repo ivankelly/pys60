@@ -42,6 +42,7 @@ import locale
 import graphics
 from PyQt4 import QtGui, QtCore
 from key_codes import *
+from menu import S60Menu
 
 STYLE_BOLD          = 0x01
 STYLE_ITALIC        = 0x02
@@ -61,6 +62,7 @@ style_title = "QLabel { font-size: 18px; font-weight: bold; color: white; text-a
 style_softrbtn = """QPushButton { font-size: 18px; background: red; color: white; font-weight: bold; text-align: right; border: 0px; padding: 5px }"""
 style_softlbtn = """QPushButton { font-size: 18px; background: red; color: white; font-weight: bold; text-align: left; border: 0px; padding: 5px }"""
 
+
 class Application(QtGui.QApplication):
     def __init__(self, **keys):
         QtGui.QApplication([])
@@ -72,32 +74,42 @@ class Application(QtGui.QApplication):
         self._rightsb = None
         self._titletext = "pyS60 Emulator"
         self._body = None
-        
+        self._s60menu = None
+
         self._menu = []
         self._exit_key_handler = None
 
+        self._tabs = []
+        self._tabcallback = None
+        self._activetab = 0
+        self._tabwidgets = []
+
         self._w = QtGui.QWidget()
-        self._w.setWindowFlags(QtCore.Qt.FramelessWindowHint)
+        #self._w.setWindowFlags(QtCore.Qt.FramelessWindowHint)
         self._w.setFixedSize(400, 600)
-        self._w.setStyleSheet(style_app)
+#        self._w.setStyleSheet(style_app)
+        self._set_screen('normal')
         self._w.show()
 
-        self._set_screen('normal')
 
     # full name of native app in whose context interpreter is running
     def full_name(self): 
-        return None
+        return "TODO"
+
+    def activate_tab(self, index):
+        self._activetab = index
+        self._main.setCurrentIndex(index)
+
+
+    def set_tabs(self, tab_texts, callback=None):
+        self._tabs = tab_texts
+        self._tabcallback = callback
+        self._drawScreenUI()
 
     # requests a graceful exit from the application as soon as the 
     # current script execution returns
     def set_exit():
         pass 
-
-    def set_tabs(self, tab_texts, callback=None):
-        self.frame.set_tabs(tab_texts, callback)
-
-    def activate_tab(self, index):
-        self.frame.tabs.SetSelection(index)
 
     def _set_body(self, val):
         pass
@@ -107,39 +119,72 @@ class Application(QtGui.QApplication):
 
     body = property(_get_body, _set_body)
 
-    def _set_screen(self, val):
-        assert(val == 'normal' or val == 'full' or val == 'large')
-        layout = QtGui.QVBoxLayout()
+    def _drawScreenUI(self):
+        layout = self._w.layout()
+        if layout == None:
+            layout = QtGui.QVBoxLayout()
+            self._w.setLayout(layout)
+        else:
+            child = layout.takeAt(0)
+            while child != None:
+                del child
+                child = layout.takeAt(0)
+            self._main = None
+            self._leftsb = None
+            self._rightsb = None
+
         layout.setSpacing(0)
         layout.setContentsMargins(0, 0, 0, 0)
-        self._w.setLayout(layout)
 
-        # setting title
-        self._title = QtGui.QLabel(self._titletext, self._w)
-        self._title.setStyleSheet(style_title)
-        self._title.setFixedHeight(40)
-        layout.addWidget(self._title)
+        if self._screen == 'normal':
+            # setting title
+            self._title = QtGui.QLabel(self._titletext, self._w)
+#            self._title.setStyleSheet(style_title)
+            self._title.setFixedHeight(40)
+            layout.addWidget(self._title)
 
         # setting body
         self._main = QtGui.QTabWidget(self._w)
-        self._main.setStyleSheet(style_main)
+        for t in self._tabs:
+            tw = QtGui.QWidget()
+            self._main.addTab(tw, t)
+            self._tabwidgets.append(tw)
+        if self._tabcallback != None:
+            self.connect(self._main, QtCore.SIGNAL('currentChanged(int)'), self._tabcallback)
+
+#        self._main.setStyleSheet(style_main)
         layout.addWidget(self._main)
 
-        # setting button bar
-        blayout = QtGui.QHBoxLayout()
-        blayout.setSpacing(0)
-        layout.addLayout(blayout)
+        if self._screen == 'normal' or self._screen == 'large':
+            # setting button bar
+            blayout = QtGui.QHBoxLayout()
+            blayout.setSpacing(0)
+            layout.addLayout(blayout)
+            
+            self._leftsb = QtGui.QPushButton(u"Foobar", self._w)
+#            self._leftsb.setStyleSheet(style_softlbtn)
+            self._leftsb.setFixedWidth(100)
 
-        self._leftsb = QtGui.QPushButton("Foobar", self._w)
-        self._leftsb.setStyleSheet(style_softlbtn)
-        self._leftsb.setFixedWidth(100)
-        
-        self._rightsb = QtGui.QPushButton("Exit", self._w)
-        self._rightsb.setStyleSheet(style_softrbtn)
-        self._rightsb.setFixedWidth(100)
-        blayout.addWidget(self._leftsb)
-        blayout.addStretch()
-        blayout.addWidget(self._rightsb)
+            self._s60menu = S60Menu(self._menu)
+            self._leftsb.setMenu(self._s60menu)
+            self._leftsb.connect(self._leftsb, QtCore.SIGNAL('clicked()'), self._leftsb, QtCore.SLOT('showMenu()'))
+
+            self._rightsb = QtGui.QPushButton("Exit", self._w)
+#            self._rightsb.setStyleSheet(style_softrbtn)
+            self._rightsb.setFixedWidth(100)
+            if self._exit_key_handler == None:
+                self.connect(self._rightsb, QtCore.SIGNAL('clicked()'), QtGui.qApp, QtCore.SLOT('quit()'))
+            else:
+                self.connect(self._rightsb, QtCore.SIGNAL('clicked()'), self._exit_key_handler)
+
+            blayout.addWidget(self._leftsb)
+            blayout.addStretch()
+            blayout.addWidget(self._rightsb)
+
+    def _set_screen(self, val):
+        assert(val == 'normal' or val == 'full' or val == 'large')
+        self._screen = val
+        self._drawScreenUI()
 
     def _get_screen(self, val):
         return self._screen
@@ -147,26 +192,29 @@ class Application(QtGui.QApplication):
     screen = property(_get_screen, _set_screen)
 
     def _set_ekh(self, h):
-        pass
+        self._exit_key_handler = h
+        self._drawScreenUI()
 
     def _get_ekh(self, h):
-        pass
+        return h
 
     exit_key_handler = property(_get_ekh, _set_ekh)
 
     def _set_menu(self, items):
-        pass
+        print "set menu"
+        self._menu = items
+        self._drawScreenUI()
 
     def _get_menu(self, items):
-        pass
+        return _menu
 
     menu = property(_get_menu, _set_menu)
 
-    def _set_title(self, items):
-        pass
+    def _set_title(self, t):
+        self._titletext = t
 
-    def _get_title(self, items):
-        pass
+    def _get_title(self, t):
+        return self._titletext
 
     title = property(_get_title, _set_title)
 
