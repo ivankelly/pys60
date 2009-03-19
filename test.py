@@ -2,7 +2,8 @@ import appuifw
 import sys
 
 def foo():
-    print "Foobar"
+    form = appuifw.Form([(u"Foobar", 'text'), (u"Barfoo", 'date')])
+    form.execute()
 
 def large():
     appuifw.app.screen = 'large'
@@ -21,6 +22,7 @@ appuifw.app.title = 'Foobar'
 appuifw.app.menu = [(u'test', foo), (u'Screen', ((u'large', large), (u'full', full), (u'normal', normal)))]
 print type(appuifw.app)
 appuifw.app.set_tabs([u"foo", u"Bar"], tab_changed)
+
 
 sys.exit(appuifw.app.exec_())
 

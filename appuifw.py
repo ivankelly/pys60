@@ -37,12 +37,13 @@ emulating Symbian applications on a desktop.
 """
 
 import time
+import datetime
 import locale
 
 import graphics
 from PyQt4 import QtGui, QtCore
 from key_codes import *
-from menu import S60Menu
+from menu import S60Menu, S60Main, S60SoftKeys
 
 STYLE_BOLD          = 0x01
 STYLE_ITALIC        = 0x02
@@ -70,25 +71,24 @@ class Application(QtGui.QApplication):
 
         self._title = None
         self._main = None
-        self._leftsb = None
-        self._rightsb = None
+        self._softkeys =None
+        self._layout = None
+
+        self._sklayout = None
+
         self._titletext = "pyS60 Emulator"
-        self._body = None
-        self._s60menu = None
 
         self._menu = []
         self._exit_key_handler = None
 
         self._tabs = []
         self._tabcallback = None
-        self._activetab = 0
-        self._tabwidgets = []
 
         self._w = QtGui.QWidget()
         #self._w.setWindowFlags(QtCore.Qt.FramelessWindowHint)
         self._w.setFixedSize(400, 600)
 #        self._w.setStyleSheet(style_app)
-        self._set_screen('normal')
+        self._screen = 'normal' 
         self._w.show()
 
 
@@ -97,7 +97,6 @@ class Application(QtGui.QApplication):
         return "TODO"
 
     def activate_tab(self, index):
-        self._activetab = index
         self._main.setCurrentIndex(index)
 
 
@@ -111,112 +110,226 @@ class Application(QtGui.QApplication):
     def set_exit():
         pass 
 
-    def _set_body(self, val):
-        pass
+    def _set_body(self, body):
+        print "set body"
+        self._main.setCurrentWidget(body)
 
-    def _get_body(self, val):
-        pass
+    def _get_body(self):
+        return self._main.currentWidget()
 
     body = property(_get_body, _set_body)
 
     def _drawScreenUI(self):
-        layout = self._w.layout()
-        if layout == None:
-            layout = QtGui.QVBoxLayout()
-            self._w.setLayout(layout)
-        else:
-            child = layout.takeAt(0)
-            while child != None:
-                del child
-                child = layout.takeAt(0)
-            self._main = None
-            self._leftsb = None
-            self._rightsb = None
+        if self._layout == None:
+            self._layout = QtGui.QVBoxLayout()
+            self._w.setLayout(self._layout)
+            self._layout.setSpacing(0)
+            self._layout.setContentsMargins(0, 0, 0, 0)
 
-        layout.setSpacing(0)
-        layout.setContentsMargins(0, 0, 0, 0)
-
-        if self._screen == 'normal':
-            # setting title
+        if self._title == None:
             self._title = QtGui.QLabel(self._titletext, self._w)
-#            self._title.setStyleSheet(style_title)
             self._title.setFixedHeight(40)
-            layout.addWidget(self._title)
+            self._layout.addWidget(self._title)
 
-        # setting body
-        self._main = QtGui.QTabWidget(self._w)
-        for t in self._tabs:
-            tw = QtGui.QWidget()
-            self._main.addTab(tw, t)
-            self._tabwidgets.append(tw)
-        if self._tabcallback != None:
-            self.connect(self._main, QtCore.SIGNAL('currentChanged(int)'), self._tabcallback)
+        if self._main == None:
+            self._main = S60Main(self._w, self._tabs, self._tabcallback)
+            self._layout.addWidget(self._main)
 
-#        self._main.setStyleSheet(style_main)
-        layout.addWidget(self._main)
+        if self._softkeys == None:
+            self._softkeys = S60SoftKeys(self._w, self._menu, self._exit_key_handler)
+            self._layout.addWidget(self._softkeys)
 
+        if self._screen != 'normal':
+            self._title.hide()
+        else:
+            self._title.show()
+
+        if self._screen == 'full':
+            self._softkeys.hide()
         if self._screen == 'normal' or self._screen == 'large':
-            # setting button bar
-            blayout = QtGui.QHBoxLayout()
-            blayout.setSpacing(0)
-            layout.addLayout(blayout)
+            self._softkeys.show()
             
-            self._leftsb = QtGui.QPushButton(u"Foobar", self._w)
-#            self._leftsb.setStyleSheet(style_softlbtn)
-            self._leftsb.setFixedWidth(100)
-
-            self._s60menu = S60Menu(self._menu)
-            self._leftsb.setMenu(self._s60menu)
-            self._leftsb.connect(self._leftsb, QtCore.SIGNAL('clicked()'), self._leftsb, QtCore.SLOT('showMenu()'))
-
-            self._rightsb = QtGui.QPushButton("Exit", self._w)
-#            self._rightsb.setStyleSheet(style_softrbtn)
-            self._rightsb.setFixedWidth(100)
-            if self._exit_key_handler == None:
-                self.connect(self._rightsb, QtCore.SIGNAL('clicked()'), QtGui.qApp, QtCore.SLOT('quit()'))
-            else:
-                self.connect(self._rightsb, QtCore.SIGNAL('clicked()'), self._exit_key_handler)
-
-            blayout.addWidget(self._leftsb)
-            blayout.addStretch()
-            blayout.addWidget(self._rightsb)
-
     def _set_screen(self, val):
         assert(val == 'normal' or val == 'full' or val == 'large')
         self._screen = val
         self._drawScreenUI()
 
-    def _get_screen(self, val):
+    def _get_screen(self):
         return self._screen
 
     screen = property(_get_screen, _set_screen)
 
     def _set_ekh(self, h):
         self._exit_key_handler = h
-        self._drawScreenUI()
+        self._softkeys.setExitKeyHandler(h)
 
-    def _get_ekh(self, h):
-        return h
+    def _get_ekh(self):
+        return self._exit_key_handler
 
     exit_key_handler = property(_get_ekh, _set_ekh)
 
     def _set_menu(self, items):
-        print "set menu"
         self._menu = items
-        self._drawScreenUI()
+        if self._softkeys != None:
+            self._softkeys.setMenu(items)
 
-    def _get_menu(self, items):
-        return _menu
+    def _get_menu(self):
+        return self._menu
 
     menu = property(_get_menu, _set_menu)
 
     def _set_title(self, t):
         self._titletext = t
 
-    def _get_title(self, t):
+    def _get_title(self):
         return self._titletext
 
     title = property(_get_title, _set_title)
+
+class Form(QtGui.QWidget):
+    FFormEditModeOnly = 1
+    FFormViewModeOnly = 2
+    FFormAutoLabelEdit = 3
+    FFormAutoFormEdit = 4
+    FFormDoubleSpaced = 5
+
+    class _item:
+        def __init__(self, name=None, type=None, value=None):
+            self.name=name
+            self.type=type
+            self.value=value
+            self._widget=w
+
+    def addfields(self, fields):
+        for f in fields:
+            i = _item()
+            if len(f) == 2:
+                (i.name, i.type) = f
+            elif len(f) == 3:
+                (i.name, i.type, i.value) =f
+            else:
+                print "FIXME: an exception of some sort"
+            self._fields.appends(f)
+
+    def __init__(self, fields=None, flags=None):
+        QtGui.QWidget.__init__(self, app.body)
+        self._fields = []
+        self._addfields(fields)
+        self._flags = flags
+        self._oldekh = None
+        self._oldmenu = None
+        self._menu = None
+
+        self._layout = QtGui.QVBoxLayout(self)
+        self.setLayout(self._layout)
+
+        self._rebuild()
+        
+    def execute(self):
+        self._oldbody = app.body
+        self._oldekh = app.exit_key_handler
+        app.exit_key_handler = self._back
+        
+        if self._menu != None:
+            self._oldmenu = app.menu
+            app.menu = self._menu
+
+        app.body = self
+        self.show()
+
+    def _rebuild(self):
+        child = self._layout.takeAt(0)
+        while child != None:
+            self._layout.removeWidget(child)
+            child = self._layout.takeAt(0)
+
+        for f in self._fields:
+            w = QtGui.QLabel(f.name)
+            self._fieldWidgets[f.name] = w
+            self._layout.addWidget(w)
+
+            box = None
+            if f.type == 'text':
+                box = QtGui.QLineEdit(self)
+                box.setText(f.value)
+            elif f.type == 'number':
+                box = QtGui.QLineEdit(self)
+                box.setText(unicode(f.value))
+            elif f.type == 'date':
+                date = None
+                if f.value = None:
+                    date = datetime.datetime.now()
+                else:
+                    date = datetime.datetime.fromtimestamp(f.value)
+                qdate = QtCore.QDate(date.year, date.month, date.day)
+                box = QtGui.QDateEdit(self, qdate)
+            elif f.type == 'time':
+                t = None
+                if f.value = None:
+                    t = datetime.datetime.now()
+                else:
+                    t = datetime.datetime.fromtimestamp(f.value)
+                qtime = QtCore.QTime(t.hour, t.minute, t.second)
+                box = QtGui.QTimeEdit(self, qtime)
+            elif f.type == 'combo':
+                box = QtGui.QComboBox(self)
+                print "FIXME: figure out what it should do"
+            if box != None:
+                self._layout.addWidget(box)
+                f._widget = box
+
+    def _back(self):
+        app.exit_key_handler = self._oldekh
+        if self._oldmenu != None:
+            app.menu = self._oldmenu
+        app.body = self._oldbody
+        self.hide()
+
+    def _set_flags(self, flags):
+        pass
+
+    def _get_flags(self, flags):
+        pass
+
+    flags = property(_get_flags, _set_flags)
+
+    def _set_menu(self, items):
+        self._menu = items
+
+    def _get_menu(self, items):
+        return _menu
+
+    menu = property(_get_menu, _set_menu)
+
+    def _get_save_hook(self, sh):
+        pass
+    def _set_save_hook(self, sh):
+        pass
+
+    save_hook = property(_get_save_hook, _set_save_hook)
+
+    def __setitem__(self, key, value):
+        self._fields[key] = value
+        self._rebuild()
+
+    def __delitem__(self, key):
+        del self._fields[key]
+        self._rebuild()
+    
+    def __getitem__(self, key):
+        return self._fields[key]
+
+    def insert(self, i, x):
+        self._fields.insert(i, x)
+        self._rebuild()
+
+    def pop(i = -1):
+        p = self._fields.pop(i)
+        self._rebuild()
+        return p
+
+    def length():
+        return len(self._fields)
 
 # class AppFrame(wx.Frame):
 #     def __init__(self, parent, id, title):
