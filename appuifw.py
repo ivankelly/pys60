@@ -39,6 +39,7 @@ emulating Symbian applications on a desktop.
 import time
 import datetime
 import locale
+import threading
 
 import graphics
 from PyQt4 import QtGui, QtCore
@@ -198,18 +199,19 @@ class Form(QtGui.QWidget):
             self.name=name
             self.type=type
             self.value=value
-            self._widget=w
+            self._label=None
+            self._widget=None
 
-    def addfields(self, fields):
+    def _addfields(self, fields):
         for f in fields:
-            i = _item()
+            i = Form._item()
             if len(f) == 2:
                 (i.name, i.type) = f
             elif len(f) == 3:
                 (i.name, i.type, i.value) =f
             else:
                 print "FIXME: an exception of some sort"
-            self._fields.appends(f)
+            self._fields.append(i)
 
     def __init__(self, fields=None, flags=None):
         QtGui.QWidget.__init__(self, app.body)
@@ -219,7 +221,7 @@ class Form(QtGui.QWidget):
         self._oldekh = None
         self._oldmenu = None
         self._menu = None
-
+#        self._waiter = threading.Event()
         self._layout = QtGui.QVBoxLayout(self)
         self.setLayout(self._layout)
 
@@ -236,6 +238,8 @@ class Form(QtGui.QWidget):
 
         app.body = self
         self.show()
+#        self._waiter.clear()
+#        self._waiter.wait()
 
     def _rebuild(self):
         child = self._layout.takeAt(0)
@@ -245,35 +249,40 @@ class Form(QtGui.QWidget):
 
         for f in self._fields:
             w = QtGui.QLabel(f.name)
-            self._fieldWidgets[f.name] = w
+            f._label = w
             self._layout.addWidget(w)
 
             box = None
             if f.type == 'text':
                 box = QtGui.QLineEdit(self)
-                box.setText(f.value)
+                if f.value != None:
+                    box.setText(f.value)
             elif f.type == 'number':
                 box = QtGui.QLineEdit(self)
-                box.setText(unicode(f.value))
+                if f.value != None:
+                    box.setText(unicode(f.value))
             elif f.type == 'date':
                 date = None
-                if f.value = None:
+                if f.value == None:
+                    print "noew"
                     date = datetime.datetime.now()
                 else:
                     date = datetime.datetime.fromtimestamp(f.value)
                 qdate = QtCore.QDate(date.year, date.month, date.day)
-                box = QtGui.QDateEdit(self, qdate)
+                box = QtGui.QDateEdit(qdate, self)
             elif f.type == 'time':
                 t = None
-                if f.value = None:
+                if f.value == None:
                     t = datetime.datetime.now()
                 else:
                     t = datetime.datetime.fromtimestamp(f.value)
                 qtime = QtCore.QTime(t.hour, t.minute, t.second)
-                box = QtGui.QTimeEdit(self, qtime)
+                box = QtGui.QTimeEdit(qtime, self)
             elif f.type == 'combo':
                 box = QtGui.QComboBox(self)
-                print "FIXME: figure out what it should do"
+                for i in f.value[0]:
+                    box.addItem(i)
+                box.setCurrentIndex(f.value[1])
             if box != None:
                 self._layout.addWidget(box)
                 f._widget = box
@@ -284,6 +293,7 @@ class Form(QtGui.QWidget):
             app.menu = self._oldmenu
         app.body = self._oldbody
         self.hide()
+#        self._waiter.set()
 
     def _set_flags(self, flags):
         pass
@@ -888,4 +898,19 @@ class Form(QtGui.QWidget):
 #     else:
 #         return None
 
-app = Application(redirect=False)
+class Foo(QtCore.QThread):
+    def run(self):
+        self.app = Application(redirect=False)
+        self.app.exec_()
+    
+    def getapp(self):
+        return self.app
+
+f = Foo()
+f.start()
+
+print "wait"
+f.wait(10000)
+print "done waiting"
+app= f.getapp()
+        
